@@ -1,0 +1,366 @@
+package utils
+
+import (
+	"fmt"
+	"reflect"
+	"strconv"
+	"time"
+)
+
+// Decoder is the interface that wraps the basic Read method.
+type Decoder interface {
+	// Decode data type conversion
+	Decode(interface{}) error
+}
+
+// NewDecoder Get Decoder interface
+func NewDecoder(val interface{}) Decoder {
+	return &decoder{input: val}
+}
+
+type decoder struct {
+	input interface{}
+}
+
+func (d *decoder) error(errInfo string) error {
+	return fmt.Errorf("[go-dal:utils:decode]%s", errInfo)
+}
+
+func (d *decoder) Decode(output interface{}) error {
+	outputValue := reflect.Indirect(reflect.ValueOf(output))
+	if !outputValue.CanAddr() {
+		return d.error("output must be addressable (a pointer)")
+	}
+	return d.decode(d.input, outputValue)
+}
+
+func (d *decoder) getKind(val reflect.Value) reflect.Kind {
+	kind := val.Kind()
+
+	switch {
+	case kind >= reflect.Int && kind <= reflect.Int64:
+		return reflect.Int
+	case kind >= reflect.Uint && kind <= reflect.Uint64:
+		return reflect.Uint
+	case kind >= reflect.Float32 && kind <= reflect.Float64:
+		return reflect.Float32
+	default:
+		return kind
+	}
+}
+
+func (d *decoder) decode(data interface{}, outputValue reflect.Value) (err error) {
+	if data == nil {
+		return
+	}
+	dataVal := reflect.ValueOf(data)
+	if !dataVal.IsValid() {
+		outputValue.Set(reflect.Zero(outputValue.Type()))
+		return
+	}
+	switch outputKind := d.getKind(outputValue); outputKind {
+	case reflect.Bool:
+		err = d.decodeBool(data, outputValue)
+	case reflect.String:
+		err = d.decodeString(data, outputValue)
+	case reflect.Int:
+		err = d.decodeInt(data, outputValue)
+	case reflect.Uint:
+		err = d.decodeUint(data, outputValue)
+	case reflect.Float32:
+		err = d.decodeFloat(data, outputValue)
+	case reflect.Struct:
+		err = d.decodeStruct(data, outputValue)
+	case reflect.Map:
+		err = d.decodeMap(data, outputValue)
+	case reflect.Slice:
+		err = d.decodeSlice(data, outputValue)
+	case reflect.Interface:
+		err = d.decodeBasic(data, outputValue)
+	default:
+		err = fmt.Errorf("Unsupported type: %s", outputKind)
+	}
+	return
+}
+
+func (d *decoder) decodeString(data interface{}, val reflect.Value) error {
+	dataVal := reflect.ValueOf(data)
+	dataKind := d.getKind(dataVal)
+	switch {
+	case dataKind == reflect.String:
+		val.SetString(dataVal.String())
+	case dataKind == reflect.Bool:
+		if dataVal.Bool() {
+			val.SetString("1")
+		} else {
+			val.SetString("0")
+		}
+	case dataKind == reflect.Int:
+		val.SetString(strconv.FormatInt(dataVal.Int(), 10))
+	case dataKind == reflect.Uint:
+		val.SetString(strconv.FormatUint(dataVal.Uint(), 10))
+	case dataKind == reflect.Float32:
+		val.SetString(strconv.FormatFloat(dataVal.Float(), 'f', -1, 64))
+	default:
+		return fmt.Errorf("expected type '%s', got unconvertible type '%s'", val.Type(), dataVal.Type())
+	}
+
+	return nil
+}
+
+func (d *decoder) decodeInt(data interface{}, val reflect.Value) error {
+	dataVal := reflect.ValueOf(data)
+	dataKind := d.getKind(dataVal)
+
+	switch {
+	case dataKind == reflect.Int:
+		val.SetInt(dataVal.Int())
+	case dataKind == reflect.Uint:
+		val.SetInt(int64(dataVal.Uint()))
+	case dataKind == reflect.Float32:
+		val.SetInt(int64(dataVal.Float()))
+	case dataKind == reflect.Bool:
+		if dataVal.Bool() {
+			val.SetInt(1)
+		} else {
+			val.SetInt(0)
+		}
+	case dataKind == reflect.String:
+		i, err := strconv.ParseInt(dataVal.String(), 10, 64)
+		if err == nil {
+			val.SetInt(i)
+		} else {
+			return err
+		}
+	default:
+		return fmt.Errorf("expected type '%s', got unconvertible type '%s'", val.Type(), dataVal.Type())
+	}
+
+	return nil
+}
+
+func (d *decoder) decodeUint(data interface{}, val reflect.Value) error {
+	dataVal := reflect.ValueOf(data)
+	dataKind := d.getKind(dataVal)
+
+	switch {
+	case dataKind == reflect.Int:
+		val.SetUint(uint64(dataVal.Int()))
+	case dataKind == reflect.Uint:
+		val.SetUint(dataVal.Uint())
+	case dataKind == reflect.Float32:
+		val.SetUint(uint64(dataVal.Float()))
+	case dataKind == reflect.Bool:
+		if dataVal.Bool() {
+			val.SetUint(1)
+		} else {
+			val.SetUint(0)
+		}
+	case dataKind == reflect.String:
+		i, err := strconv.ParseUint(dataVal.String(), 10, 64)
+		if err == nil {
+			val.SetUint(i)
+		} else {
+			return err
+		}
+	default:
+		return fmt.Errorf("expected type '%s', got unconvertible type '%s'", val.Type(), dataVal.Type())
+	}
+
+	return nil
+}
+
+func (d *decoder) decodeBool(data interface{}, val reflect.Value) error {
+	dataVal := reflect.ValueOf(data)
+	dataKind := d.getKind(dataVal)
+
+	switch {
+	case dataKind == reflect.Bool:
+		val.SetBool(dataVal.Bool())
+	case dataKind == reflect.Int:
+		val.SetBool(dataVal.Int() != 0)
+	case dataKind == reflect.Uint:
+		val.SetBool(dataVal.Uint() != 0)
+	case dataKind == reflect.Float32:
+		val.SetBool(dataVal.Float() != 0)
+	case dataKind == reflect.String:
+		b, err := strconv.ParseBool(dataVal.String())
+		if err == nil {
+			val.SetBool(b)
+		} else if dataVal.String() == "" {
+			val.SetBool(false)
+		} else {
+			return err
+		}
+	default:
+		return fmt.Errorf("expected type '%s', got unconvertible type '%s'", val.Type(), dataVal.Type())
+	}
+
+	return nil
+}
+
+func (d *decoder) decodeFloat(data interface{}, val reflect.Value) error {
+	dataVal := reflect.ValueOf(data)
+	dataKind := d.getKind(dataVal)
+
+	switch {
+	case dataKind == reflect.Int:
+		val.SetFloat(float64(dataVal.Int()))
+	case dataKind == reflect.Uint:
+		val.SetFloat(float64(dataVal.Uint()))
+	case dataKind == reflect.Float32:
+		val.SetFloat(float64(dataVal.Float()))
+	case dataKind == reflect.Bool:
+		if dataVal.Bool() {
+			val.SetFloat(1)
+		} else {
+			val.SetFloat(0)
+		}
+	case dataKind == reflect.String:
+		f, err := strconv.ParseFloat(dataVal.String(), val.Type().Bits())
+		if err == nil {
+			val.SetFloat(f)
+		} else {
+			return err
+		}
+	default:
+		return fmt.Errorf("expected type '%s', got unconvertible type '%s'", val.Type(), dataVal.Type())
+	}
+
+	return nil
+}
+
+func (d *decoder) decodeMap(data interface{}, val reflect.Value) error {
+	valType := val.Type()
+	valKeyType := valType.Key()
+	valElemType := valType.Elem()
+
+	if val.IsNil() {
+		mapType := reflect.MapOf(valKeyType, valElemType)
+		val = reflect.MakeMap(mapType)
+	}
+
+	dataVal := reflect.Indirect(reflect.ValueOf(data))
+
+	switch {
+	case dataVal.Kind() == reflect.Map:
+		for _, dataKey := range dataVal.MapKeys() {
+			currentKey := reflect.Indirect(reflect.New(valKeyType))
+			if err := d.decode(dataKey.Interface(), currentKey); err != nil {
+				return err
+			}
+			currentValue := reflect.Indirect(reflect.New(valElemType))
+			if err := d.decode(dataVal.MapIndex(dataKey).Interface(), currentValue); err != nil {
+				return err
+			}
+			val.SetMapIndex(currentKey, currentValue)
+		}
+	case dataVal.Kind() == reflect.Struct:
+		dataType := reflect.TypeOf(data)
+		for i, l := 0, dataType.NumField(); i < l; i++ {
+			field := dataType.Field(i)
+			fieldValue := dataVal.FieldByName(field.Name).Interface()
+			if field.Type.String() == "time.Time" && valElemType.Kind() == reflect.String {
+				if !reflect.DeepEqual(reflect.Zero(field.Type).Interface(),fieldValue){
+					val.SetMapIndex(reflect.ValueOf(field.Name), reflect.ValueOf(fieldValue.(time.Time).Format(time.RFC3339Nano)))
+				}
+				continue
+			}
+			currentValue := reflect.Indirect(reflect.New(valElemType))
+			
+			if reflect.DeepEqual(fieldValue, reflect.Zero(field.Type).Interface()) {
+				fieldValue = reflect.Zero(field.Type).Interface()
+			}
+			if err := d.decode(fieldValue, currentValue); err != nil {
+				return err
+			}
+			val.SetMapIndex(reflect.ValueOf(field.Name), currentValue)
+		}
+	default:
+		return fmt.Errorf("expected type '%s', got unconvertible type '%s'", val.Type(), dataVal.Type())
+	}
+
+	return nil
+}
+
+func (d *decoder) decodeSlice(data interface{}, val reflect.Value) error {
+	dataVal := reflect.Indirect(reflect.ValueOf(data))
+
+	if dataVal.Kind() != reflect.Slice {
+		return fmt.Errorf("Expected type slice")
+	}
+
+	if dataVal.Type() == val.Type() {
+		val.Set(dataVal)
+		return nil
+	}
+
+	valSlice := reflect.MakeSlice(reflect.SliceOf(val.Type().Elem()), dataVal.Len(), dataVal.Len())
+	for i := 0; i < dataVal.Len(); i++ {
+		currentData := dataVal.Index(i).Interface()
+		currentField := valSlice.Index(i)
+		if err := d.decode(currentData, currentField); err != nil {
+			return err
+		}
+	}
+	val.Set(valSlice)
+
+	return nil
+}
+
+func (d *decoder) decodeStruct(data interface{}, val reflect.Value) error {
+	dataVal := reflect.Indirect(reflect.ValueOf(data))
+	valType := val.Type()
+
+	if dataVal.Type() == valType {
+		val.Set(dataVal)
+		return nil
+	}
+
+	if kind := dataVal.Kind(); kind != reflect.Map {
+		return fmt.Errorf("Expected a map, got '%s'", kind.String())
+	}
+
+	for _, dataKey := range dataVal.MapKeys() {
+		name := dataKey.String()
+		for i, l := 0, valType.NumField(); i < l; i++ {
+			tField := valType.Field(i)
+			if name == tField.Name {
+				field := val.Field(i)
+				if !field.CanSet() {
+					break
+				}
+				mVal := dataVal.MapIndex(dataKey).Interface()
+				if tField.Type.String() == "time.Time" {
+					if v, ok := mVal.(string); ok && v != "" {
+						t, err := time.Parse(time.RFC3339Nano, v)
+						if err != nil {
+							return err
+						}
+						field.Set(reflect.ValueOf(t))
+					} else if v, ok := mVal.(time.Time); ok {
+						field.Set(reflect.ValueOf(v))
+					}
+					continue
+				}
+				err := d.decode(mVal, field)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (d *decoder) decodeBasic(data interface{}, val reflect.Value) error {
+	dataVal := reflect.ValueOf(data)
+	dataValType := dataVal.Type()
+	if !dataValType.AssignableTo(val.Type()) {
+		return fmt.Errorf("expected type '%s', got unconvertible type '%s'", val.Type(), dataValType)
+	}
+
+	val.Set(dataVal)
+	return nil
+}
