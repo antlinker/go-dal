@@ -6,8 +6,31 @@ type QueryPagerResult struct {
 	Total int64               `json:"total"`
 }
 
-// TranResult 事务执行结果
+// ResultError 提供统一的错误处理
+type ResultError struct {
+	Error error
+}
+
+// TranEntityResult 提供事务实体
+type TranEntityResult struct {
+	ResultError
+	Entity TranEntity
+}
+
+// QueryEntityResult 提供查询实体
+type QueryEntityResult struct {
+	ResultError
+	Entity QueryEntity
+}
+
+// ConditionResult 提供查询条件处理
+type QueryConditionResult struct {
+	ResultError
+	Condition QueryCondition
+}
+
+// TranResult 提供事务结果处理
 type TranResult struct {
+	ResultError
 	Result int64
-	Error  error
 }

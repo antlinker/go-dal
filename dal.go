@@ -51,9 +51,14 @@ const (
 )
 
 var (
+	// GDAL 提供全局的Provider
 	GDAL      Provider
 	providers map[ProvideEngine]DBProvider
 )
+
+func init() {
+	providers = make(map[ProvideEngine]DBProvider)
+}
 
 // RegisterDBProvider 注册DBProvider
 func RegisterDBProvider(provideName ProvideEngine, provider DBProvider) {

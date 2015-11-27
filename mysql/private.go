@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/LyricTian/go-dal"
+	"gopkg.in/dal.v1"
 )
 
 func (mp *MysqlProvider) getInsertSQL(entity dal.TranEntity) (sqlText string, values []interface{}, err error) {
 	if len(entity.FieldsValue) == 0 {
-		err = mp.Error("getInsertSql", "`FieldsValue` can't be empty!")
+		err = mp.Error("`FieldsValue` can't be empty!")
 		return
 	}
 	var (
@@ -29,7 +29,7 @@ func (mp *MysqlProvider) getInsertSQL(entity dal.TranEntity) (sqlText string, va
 
 func (mp *MysqlProvider) getUpdateSQL(entity dal.TranEntity) (sqlText string, values []interface{}, err error) {
 	if len(entity.FieldsValue) == 0 {
-		err = mp.Error("getUpdateSql", "`FieldsValue` can't be empty!")
+		err = mp.Error("`FieldsValue` can't be empty!")
 		return
 	}
 	var (
@@ -43,7 +43,7 @@ func (mp *MysqlProvider) getUpdateSQL(entity dal.TranEntity) (sqlText string, va
 	if err != nil {
 		return
 	}
-	values = append(values, condValues)
+	values = append(values, condValues...)
 	sqlText = fmt.Sprintf("UPDATE %s SET %s %s", entity.Table, strings.Join(fields, ","), condSQL)
 	return
 }
@@ -58,11 +58,10 @@ func (mp *MysqlProvider) getDeleteSQL(entity dal.TranEntity) (sqlText string, va
 }
 
 func (mp *MysqlProvider) parseCondition(cond dal.QueryCondition) (sqlText string, values []interface{}, err error) {
-	funcName := "parseCondition"
 	switch cond.CType {
 	case dal.COND_KV:
 		if len(cond.FieldsKv) == 0 {
-			err = mp.Error(funcName, "`FieldsKv` can't be empty!")
+			err = mp.Error("`FieldsKv` can't be empty!")
 			return
 		}
 		var (
@@ -75,13 +74,13 @@ func (mp *MysqlProvider) parseCondition(cond dal.QueryCondition) (sqlText string
 		sqlText = fmt.Sprintf("WHERE %s", strings.Join(fields, " and "))
 	case dal.COND_CV:
 		if cond.Condition == "" {
-			err = mp.Error(funcName, "`Condition` can't be empty!")
+			err = mp.Error("`Condition` can't be empty!")
 			return
 		}
 		sqlText = cond.Condition
 		values = cond.Values
 	default:
-		err = mp.Error(funcName, "`QueryCondition` can't be empty!")
+		err = mp.Error("`QueryCondition` can't be empty!")
 	}
 	return
 }

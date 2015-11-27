@@ -7,8 +7,14 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/LyricTian/go-dal"
+	"gopkg.in/dal.v1"
+	"gopkg.in/dal.v1/utils"
 	_ "github.com/go-sql-driver/mysql"
+)
+
+const (
+	DefaultMaxOpenConns = 0
+	DefaultMaxIdleConns = 500
 )
 
 var (
@@ -23,42 +29,42 @@ type Config struct {
 
 type MysqlProvider struct{}
 
-func (mp *MysqlProvider) Error(funcName, errInfo string) error {
-	return fmt.Errorf("[go-dal:mysql:mysql.go]%s:%s", funcName, errInfo)
+func (mp *MysqlProvider) Error(errInfo string) error {
+	return fmt.Errorf("[go-dal:mysql:mysql.go]%s", errInfo)
 }
 
 func (mp *MysqlProvider) InitDB(config string) error {
-	funcName := "InitDB"
 	var cfg Config
 	if err := json.NewDecoder(bytes.NewBufferString(config)).Decode(&cfg); err != nil {
-		return mp.Error(funcName, err.Error())
+		return mp.Error(err.Error())
 	}
 	if cfg.DataSource == "" {
-		return mp.Error(funcName, "`datasource` can't be empty!")
+		return mp.Error("`datasource` can't be empty!")
 	}
 	db, err := sql.Open("mysql", cfg.DataSource)
 	if err != nil {
-		return mp.Error(funcName, err.Error())
+		return mp.Error(err.Error())
 	}
-	if v := cfg.MaxOpenConns; v > 0 {
-		db.SetMaxOpenConns(v)
+	if v := cfg.MaxOpenConns; v < 0 {
+		cfg.MaxOpenConns = DefaultMaxOpenConns
 	}
-	if v := cfg.MaxIdleConns; v > 0 {
-		db.SetMaxIdleConns(v)
+	db.SetMaxOpenConns(cfg.MaxOpenConns)
+	if v := cfg.MaxIdleConns; v < 0 {
+		cfg.MaxIdleConns = DefaultMaxIdleConns
 	}
+	db.SetMaxIdleConns(cfg.MaxIdleConns)
 	GDB = db
 	return nil
 }
 
 func (mp *MysqlProvider) Single(entity dal.QueryEntity) (map[string]string, error) {
-	funcName := "Single"
 	if entity.ResultType != dal.Single {
 		entity.ResultType = dal.Single
 	}
 	sqlText, values := mp.parseQuerySQL(entity)
 	data, err := mp.queryData(sqlText[0], values...)
 	if err != nil {
-		return nil, mp.Error(funcName, err.Error())
+		return nil, mp.Error(err.Error())
 	}
 	if len(data) == 0 {
 		return make(map[string]string), nil
@@ -66,23 +72,37 @@ func (mp *MysqlProvider) Single(entity dal.QueryEntity) (map[string]string, erro
 	return data[0], nil
 }
 
+func (mp *MysqlProvider) AssignSingle(entity dal.QueryEntity, output interface{}) error {
+	data, err := mp.Single(entity)
+	if err != nil {
+		return err
+	}
+	return utils.NewDecoder(data).Decode(output)
+}
+
 func (mp *MysqlProvider) List(entity dal.QueryEntity) ([]map[string]string, error) {
-	funcName := "List"
 	if entity.ResultType != dal.List {
 		entity.ResultType = dal.List
 	}
 	sqlText, values := mp.parseQuerySQL(entity)
 	data, err := mp.queryData(sqlText[0], values...)
 	if err != nil {
-		return nil, mp.Error(funcName, err.Error())
+		return nil, mp.Error(err.Error())
 	}
 
 	return data, nil
 }
 
+func (mp *MysqlProvider) AssignList(entity dal.QueryEntity, output interface{}) error {
+	data, err := mp.List(entity)
+	if err != nil {
+		return err
+	}
+	return utils.NewDecoder(data).Decode(output)
+}
+
 func (mp *MysqlProvider) Pager(entity dal.QueryEntity) (dal.QueryPagerResult, error) {
 	var qResult dal.QueryPagerResult
-	funcName := "Pager"
 	if entity.ResultType != dal.Pager {
 		entity.ResultType = dal.Pager
 	}
@@ -124,7 +144,7 @@ func (mp *MysqlProvider) Pager(entity dal.QueryEntity) (dal.QueryPagerResult, er
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return qResult, mp.Error(funcName, errs[0].Error())
+		return qResult, mp.Error(errs[0].Error())
 	}
 
 	return qResult, nil
@@ -139,13 +159,12 @@ func (mp *MysqlProvider) Query(entity dal.QueryEntity) (interface{}, error) {
 	case dal.Pager:
 		return mp.Pager(entity)
 	}
-	return nil, mp.Error("Query", "The unknown `ResultType`")
+	return nil, mp.Error("The unknown `ResultType`")
 }
 
 func (mp *MysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
-	funcName := "Exec"
 	if entity.Table == "" {
-		result.Error = mp.Error(funcName, "`Table` can't be empty!")
+		result.Error = mp.Error("`Table` can't be empty!")
 		return
 	}
 	var (
@@ -166,7 +185,7 @@ func (mp *MysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
 	}
 	sqlResult, err := GDB.Exec(sqlText, values...)
 	if err != nil {
-		result.Error = mp.Error(funcName, err.Error())
+		result.Error = mp.Error(err.Error())
 		return
 	}
 	if entity.Operate == dal.A {
@@ -175,15 +194,14 @@ func (mp *MysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
 		result.Result, err = sqlResult.RowsAffected()
 	}
 	if err != nil {
-		result.Error = mp.Error(funcName, err.Error())
+		result.Error = mp.Error(err.Error())
 	}
 	return
 }
 
 func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranResult) {
-	funcName := "ExecTrans"
 	if len(entities) == 0 {
-		result.Error = mp.Error(funcName, "`entities` can't be empty!")
+		result.Error = mp.Error("`entities` can't be empty!")
 		return
 	}
 	var (
@@ -194,7 +212,7 @@ func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranRe
 	)
 	tx, err := GDB.Begin()
 	if err != nil {
-		result.Error = mp.Error(funcName, err.Error())
+		result.Error = mp.Error(err.Error())
 		return
 	}
 	for i, l := 0, len(entities); i < l; i++ {
@@ -219,7 +237,7 @@ func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranRe
 	}
 	if err != nil {
 		tx.Rollback()
-		result.Error = mp.Error(funcName, err.Error())
+		result.Error = mp.Error(err.Error())
 		return
 	}
 	tx.Commit()
@@ -228,5 +246,5 @@ func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranRe
 }
 
 func init() {
-	// dal.RegisterDBProvider(dal.MYSQL, new(MysqlProvider))
+	dal.RegisterDBProvider(dal.MYSQL, new(MysqlProvider))
 }

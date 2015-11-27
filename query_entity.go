@@ -1,8 +1,6 @@
 package dal
 
-import (
-	"strings"
-)
+import "strings"
 
 // QueryResultType 查询结果类型
 type QueryResultType byte
@@ -17,8 +15,9 @@ const (
 )
 
 // NewQueryEntity 创建新的查询实体
-func NewQueryEntity(table string, cond QueryCondition, fields ...string) func(resultType ...QueryResultType) QueryEntity {
-	return func(resultType ...QueryResultType) QueryEntity {
+func NewQueryEntity(table string, cond QueryCondition, fields ...string) func(resultType ...QueryResultType) QueryEntityResult {
+	return func(resultType ...QueryResultType) QueryEntityResult {
+		var result QueryEntityResult
 		entity := QueryEntity{
 			Table:        table,
 			FieldsSelect: strings.Join(fields, ","),
@@ -27,19 +26,22 @@ func NewQueryEntity(table string, cond QueryCondition, fields ...string) func(re
 		if len(resultType) > 0 {
 			entity.ResultType = resultType[0]
 		}
-		return entity
+		result.Entity = entity
+		return result
 	}
 }
 
 // NewQueryPagerEntity 创建新的分页查询实体
-func NewQueryPagerEntity(table string, cond QueryCondition, pagerParam PagerParam, fields ...string) QueryEntity {
-	return QueryEntity{
+func NewQueryPagerEntity(table string, cond QueryCondition, pagerParam PagerParam, fields ...string) QueryEntityResult {
+	var result QueryEntityResult
+	result.Entity = QueryEntity{
 		Table:        table,
 		FieldsSelect: strings.Join(fields, ","),
 		Condition:    cond,
 		ResultType:   Pager,
 		PagerParam:   pagerParam,
 	}
+	return result
 }
 
 // NewPagerParam 创建新的分页参数
@@ -51,15 +53,15 @@ func NewPagerParam(pageIndex, pageSize int) PagerParam {
 		pageSize = 15
 	}
 	return PagerParam{
-		PageIndex:  pageIndex,
-		PageSize:   pageSize,
+		PageIndex: pageIndex,
+		PageSize:  pageSize,
 	}
 }
 
 // PagerParam 分页参数
 type PagerParam struct {
-	PageIndex  int
-	PageSize   int
+	PageIndex int
+	PageSize  int
 }
 
 // QueryEntity 提供数据查询结构体

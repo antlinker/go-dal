@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -126,7 +127,11 @@ func (d *decoder) decodeInt(data interface{}, val reflect.Value) error {
 			val.SetInt(0)
 		}
 	case dataKind == reflect.String:
-		i, err := strconv.ParseInt(dataVal.String(), 10, 64)
+		dVal := dataVal.String()
+		if dVal == "" {
+			dVal = "0"
+		}
+		i, err := strconv.ParseInt(dVal, 10, 64)
 		if err == nil {
 			val.SetInt(i)
 		} else {
@@ -157,7 +162,11 @@ func (d *decoder) decodeUint(data interface{}, val reflect.Value) error {
 			val.SetUint(0)
 		}
 	case dataKind == reflect.String:
-		i, err := strconv.ParseUint(dataVal.String(), 10, 64)
+		dVal := dataVal.String()
+		if dVal == "" {
+			dVal = "0"
+		}
+		i, err := strconv.ParseUint(dVal, 10, 64)
 		if err == nil {
 			val.SetUint(i)
 		} else {
@@ -217,7 +226,11 @@ func (d *decoder) decodeFloat(data interface{}, val reflect.Value) error {
 			val.SetFloat(0)
 		}
 	case dataKind == reflect.String:
-		f, err := strconv.ParseFloat(dataVal.String(), val.Type().Bits())
+		dVal := dataVal.String()
+		if dVal == "" {
+			dVal = "0"
+		}
+		f, err := strconv.ParseFloat(dVal, 64)
 		if err == nil {
 			val.SetFloat(f)
 		} else {
@@ -235,9 +248,10 @@ func (d *decoder) decodeMap(data interface{}, val reflect.Value) error {
 	valKeyType := valType.Key()
 	valElemType := valType.Elem()
 
+	valMap := val
 	if val.IsNil() {
 		mapType := reflect.MapOf(valKeyType, valElemType)
-		val = reflect.MakeMap(mapType)
+		valMap = reflect.MakeMap(mapType)
 	}
 
 	dataVal := reflect.Indirect(reflect.ValueOf(data))
@@ -253,32 +267,34 @@ func (d *decoder) decodeMap(data interface{}, val reflect.Value) error {
 			if err := d.decode(dataVal.MapIndex(dataKey).Interface(), currentValue); err != nil {
 				return err
 			}
-			val.SetMapIndex(currentKey, currentValue)
+			valMap.SetMapIndex(currentKey, currentValue)
 		}
 	case dataVal.Kind() == reflect.Struct:
 		dataType := reflect.TypeOf(data)
 		for i, l := 0, dataType.NumField(); i < l; i++ {
 			field := dataType.Field(i)
 			fieldValue := dataVal.FieldByName(field.Name).Interface()
+			if reflect.DeepEqual(fieldValue, reflect.Zero(field.Type).Interface()) {
+				// fieldValue = reflect.Zero(field.Type).Interface()
+				continue
+			}
 			if field.Type.String() == "time.Time" && valElemType.Kind() == reflect.String {
-				if !reflect.DeepEqual(reflect.Zero(field.Type).Interface(),fieldValue){
+				if !reflect.DeepEqual(reflect.Zero(field.Type).Interface(), fieldValue) {
 					val.SetMapIndex(reflect.ValueOf(field.Name), reflect.ValueOf(fieldValue.(time.Time).Format(time.RFC3339Nano)))
 				}
 				continue
 			}
 			currentValue := reflect.Indirect(reflect.New(valElemType))
-			
-			if reflect.DeepEqual(fieldValue, reflect.Zero(field.Type).Interface()) {
-				fieldValue = reflect.Zero(field.Type).Interface()
-			}
 			if err := d.decode(fieldValue, currentValue); err != nil {
 				return err
 			}
-			val.SetMapIndex(reflect.ValueOf(field.Name), currentValue)
+			valMap.SetMapIndex(reflect.ValueOf(field.Name), currentValue)
 		}
 	default:
 		return fmt.Errorf("expected type '%s', got unconvertible type '%s'", val.Type(), dataVal.Type())
 	}
+
+	val.Set(valMap)
 
 	return nil
 }
@@ -325,7 +341,7 @@ func (d *decoder) decodeStruct(data interface{}, val reflect.Value) error {
 		name := dataKey.String()
 		for i, l := 0, valType.NumField(); i < l; i++ {
 			tField := valType.Field(i)
-			if name == tField.Name {
+			if strings.ToUpper(name) == strings.ToUpper(tField.Name) {
 				field := val.Field(i)
 				if !field.CanSet() {
 					break
@@ -333,7 +349,16 @@ func (d *decoder) decodeStruct(data interface{}, val reflect.Value) error {
 				mVal := dataVal.MapIndex(dataKey).Interface()
 				if tField.Type.String() == "time.Time" {
 					if v, ok := mVal.(string); ok && v != "" {
-						t, err := time.Parse(time.RFC3339Nano, v)
+						format := time.RFC3339
+						switch {
+						case len(v) == 4:
+							format = "2006"
+						case len(v) > 4 && len(v) < 10:
+							format = "2006-01"
+						case len(v) == 10:
+							format = "2006-01-02"
+						}
+						t, err := time.Parse(format, v)
 						if err != nil {
 							return err
 						}
