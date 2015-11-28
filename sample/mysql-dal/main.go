@@ -19,16 +19,24 @@ type Student struct {
 }
 
 func main() {
-	dal.RegisterProvider(dal.MYSQL, `{"datasource":"root:123456@tcp(192.168.33.70:3306)/testdb?charset=utf8","maxopen":100,"maxidle":50}`)
-	insert()
-	list()
-	update()
-	list()
-	delete()
-	list()
+	dal.RegisterProvider(dal.MYSQL,
+		`{
+		"datasource":"root:123456@tcp(127.0.0.1:3306)/testdb?charset=utf8",
+		"maxopen":100,
+		"maxidle":50
+	}`)
+	// insert()
+	// list()
+	// update()
+	// list()
+	// delete()
+	// list()
+	// transaction()
+	// list()
+	single()
 }
 
-func insert() {
+func getAddEntity() dal.TranEntity {
 	stud := Student{
 		StuCode:  "S001",
 		StuName:  "Lyric",
@@ -37,7 +45,11 @@ func insert() {
 		Birthday: time.Now(),
 		Memo:     "Message...",
 	}
-	entity := dal.NewTranAEntity("student", stud).Entity
+	return dal.NewTranAEntity("student", stud).Entity
+}
+
+func insert() {
+	entity := getAddEntity()
 	result := dal.GDAL.Exec(entity)
 	if err := result.Error; err != nil {
 		panic(err)
@@ -45,14 +57,19 @@ func insert() {
 	fmt.Println("===> Student Insert:", result.Result)
 }
 
-func update() {
+func getUpdateEntity() dal.TranEntity {
 	stud := map[string]interface{}{
-		"StuName": "Lyric01",
-		"Sex":     1,
+		"StuName": "Elva",
+		"Sex":     2,
 		"Age":     26,
 	}
 	cond := dal.NewFieldsKvCondition(map[string]interface{}{"StuCode": "S001"}).Condition
 	entity := dal.NewTranUEntity("student", stud, cond).Entity
+	return entity
+}
+
+func update() {
+	entity := getUpdateEntity()
 	result := dal.GDAL.Exec(entity)
 	if err := result.Error; err != nil {
 		panic(err)
@@ -70,6 +87,18 @@ func delete() {
 	fmt.Println("===> Student Delete:", result.Result)
 }
 
+func single() {
+	entity := dal.NewQueryEntity("student",
+		dal.NewFieldsKvCondition(map[string]interface{}{"StuCode": "S001"}).Condition,
+		"StuName", "StuCode", "Memo")().Entity
+
+	data, err := dal.GDAL.Single(entity)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("===> Student Single:", data)
+}
+
 func list() {
 	entity := dal.NewQueryEntity("student", dal.QueryCondition{}, "*")(dal.List).Entity
 	var stuData []Student
@@ -78,4 +107,15 @@ func list() {
 		panic(err)
 	}
 	fmt.Println("===> Student List:", stuData)
+}
+
+func transaction() {
+	var transEntity []dal.TranEntity
+	transEntity = append(transEntity, getAddEntity())
+	transEntity = append(transEntity, getUpdateEntity())
+	result := dal.GDAL.ExecTrans(transEntity)
+	if err := result.Error; err != nil {
+		panic(err)
+	}
+	fmt.Println("===> Execute Transaction:", result.Result)
 }
