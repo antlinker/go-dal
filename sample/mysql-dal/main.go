@@ -26,14 +26,14 @@ func main() {
 		"maxidle":50
 	}`)
 	// insert()
-	// list()
 	// update()
-	// list()
 	// delete()
-	// list()
 	// transaction()
 	// list()
-	single()
+	// single()
+	// pager()
+	// insertManyData()
+	// pager()
 }
 
 func getAddEntity() dal.TranEntity {
@@ -50,7 +50,7 @@ func getAddEntity() dal.TranEntity {
 
 func insert() {
 	entity := getAddEntity()
-	result := dal.GDAL.Exec(entity)
+	result := dal.Exec(entity)
 	if err := result.Error; err != nil {
 		panic(err)
 	}
@@ -70,7 +70,7 @@ func getUpdateEntity() dal.TranEntity {
 
 func update() {
 	entity := getUpdateEntity()
-	result := dal.GDAL.Exec(entity)
+	result := dal.Exec(entity)
 	if err := result.Error; err != nil {
 		panic(err)
 	}
@@ -80,7 +80,7 @@ func update() {
 func delete() {
 	cond := dal.NewFieldsKvCondition(Student{StuCode: "S001"}).Condition
 	entity := dal.NewTranDEntity("student", cond).Entity
-	result := dal.GDAL.Exec(entity)
+	result := dal.Exec(entity)
 	if err := result.Error; err != nil {
 		panic(err)
 	}
@@ -92,7 +92,7 @@ func single() {
 		dal.NewFieldsKvCondition(map[string]interface{}{"StuCode": "S001"}).Condition,
 		"StuName", "StuCode", "Memo")().Entity
 
-	data, err := dal.GDAL.Single(entity)
+	data, err := dal.Single(entity)
 	if err != nil {
 		panic(err)
 	}
@@ -100,9 +100,9 @@ func single() {
 }
 
 func list() {
-	entity := dal.NewQueryEntity("student", dal.QueryCondition{}, "*")(dal.List).Entity
+	entity := dal.NewQueryEntity("student", dal.QueryCondition{}, "*")().Entity
 	var stuData []Student
-	err := dal.GDAL.AssignList(entity, &stuData)
+	err := dal.AssignList(entity, &stuData)
 	if err != nil {
 		panic(err)
 	}
@@ -113,9 +113,40 @@ func transaction() {
 	var transEntity []dal.TranEntity
 	transEntity = append(transEntity, getAddEntity())
 	transEntity = append(transEntity, getUpdateEntity())
-	result := dal.GDAL.ExecTrans(transEntity)
+	result := dal.ExecTrans(transEntity)
 	if err := result.Error; err != nil {
 		panic(err)
 	}
 	fmt.Println("===> Execute Transaction:", result.Result)
+}
+
+func insertManyData() {
+	var entities []dal.TranEntity
+	for i := 0; i < 1000; i++ {
+		var stu Student
+		stu.StuCode = fmt.Sprintf("S-%d", i)
+		stu.StuName = fmt.Sprintf("SName-%d", i)
+		stu.Birthday = time.Now()
+		entities = append(entities, dal.NewTranAEntity("student", stu).Entity)
+	}
+	result := dal.ExecTrans(entities)
+	if err := result.Error; err != nil {
+		panic(err)
+	}
+	fmt.Println("===> Insert data numbers:", result.Result)
+}
+
+func pager() {
+	entity := dal.NewQueryPagerEntity("student",
+		dal.NewCondition("where StuCode like ? order by ID", "S-%").Condition,
+		dal.NewPagerParam(1, 20),
+		"StuCode", "StuName", "Birthday").Entity
+	result, err := dal.Pager(entity)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("===> Query total:")
+	fmt.Println(result.Total)
+	fmt.Println("===> Query rows:")
+	fmt.Println(result.Rows)
 }

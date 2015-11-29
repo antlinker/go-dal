@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"sync"
 
+	_ "github.com/go-sql-driver/mysql"
 	"gopkg.in/dal.v1"
 	"gopkg.in/dal.v1/utils"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 const (
@@ -58,8 +58,8 @@ func (mp *MysqlProvider) InitDB(config string) error {
 }
 
 func (mp *MysqlProvider) Single(entity dal.QueryEntity) (map[string]string, error) {
-	if entity.ResultType != dal.Single {
-		entity.ResultType = dal.Single
+	if entity.ResultType != dal.QSingle {
+		entity.ResultType = dal.QSingle
 	}
 	sqlText, values := mp.parseQuerySQL(entity)
 	data, err := mp.queryData(sqlText[0], values...)
@@ -81,8 +81,8 @@ func (mp *MysqlProvider) AssignSingle(entity dal.QueryEntity, output interface{}
 }
 
 func (mp *MysqlProvider) List(entity dal.QueryEntity) ([]map[string]string, error) {
-	if entity.ResultType != dal.List {
-		entity.ResultType = dal.List
+	if entity.ResultType != dal.QList {
+		entity.ResultType = dal.QList
 	}
 	sqlText, values := mp.parseQuerySQL(entity)
 	data, err := mp.queryData(sqlText[0], values...)
@@ -103,8 +103,8 @@ func (mp *MysqlProvider) AssignList(entity dal.QueryEntity, output interface{}) 
 
 func (mp *MysqlProvider) Pager(entity dal.QueryEntity) (dal.QueryPagerResult, error) {
 	var qResult dal.QueryPagerResult
-	if entity.ResultType != dal.Pager {
-		entity.ResultType = dal.Pager
+	if entity.ResultType != dal.QPager {
+		entity.ResultType = dal.QPager
 	}
 	sqlText, values := mp.parseQuerySQL(entity)
 	var (
@@ -116,6 +116,7 @@ func (mp *MysqlProvider) Pager(entity dal.QueryEntity) (dal.QueryPagerResult, er
 
 	go func(result *dal.QueryPagerResult, errs *[]error) {
 		defer wg.Done()
+		rData := make([]map[string]interface{}, 0)
 		data, err := mp.queryData(sqlText[0], values...)
 		mux.Lock()
 		defer mux.Unlock()
@@ -123,8 +124,14 @@ func (mp *MysqlProvider) Pager(entity dal.QueryEntity) (dal.QueryPagerResult, er
 			*errs = append(*errs, err)
 			return
 		}
-		(*result).Rows = data
-
+		if len(data) > 0 {
+			err = utils.NewDecoder(data).Decode(&rData)
+			if err != nil {
+				*errs = append(*errs, err)
+				return
+			}
+		}
+		(*result).Rows = rData
 	}(&qResult, &errs)
 
 	go func(result *dal.QueryPagerResult, errs *[]error) {
@@ -152,11 +159,11 @@ func (mp *MysqlProvider) Pager(entity dal.QueryEntity) (dal.QueryPagerResult, er
 
 func (mp *MysqlProvider) Query(entity dal.QueryEntity) (interface{}, error) {
 	switch entity.ResultType {
-	case dal.Single:
+	case dal.QSingle:
 		return mp.Single(entity)
-	case dal.List:
+	case dal.QList:
 		return mp.List(entity)
-	case dal.Pager:
+	case dal.QPager:
 		return mp.Pager(entity)
 	}
 	return nil, mp.Error("The unknown `ResultType`")
@@ -173,11 +180,11 @@ func (mp *MysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
 		err     error
 	)
 	switch entity.Operate {
-	case dal.A:
+	case dal.TA:
 		sqlText, values, err = mp.getInsertSQL(entity)
-	case dal.U:
+	case dal.TU:
 		sqlText, values, err = mp.getUpdateSQL(entity)
-	case dal.D:
+	case dal.TD:
 		sqlText, values, err = mp.getDeleteSQL(entity)
 	}
 	if err != nil {
@@ -188,7 +195,7 @@ func (mp *MysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
 		result.Error = mp.Error(err.Error())
 		return
 	}
-	if entity.Operate == dal.A {
+	if entity.Operate == dal.TA {
 		result.Result, err = sqlResult.LastInsertId()
 	} else {
 		result.Result, err = sqlResult.RowsAffected()
@@ -218,11 +225,11 @@ func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranRe
 	for i, l := 0, len(entities); i < l; i++ {
 		entity := entities[i]
 		switch entity.Operate {
-		case dal.A:
+		case dal.TA:
 			sqlText, values, err = mp.getInsertSQL(entity)
-		case dal.U:
+		case dal.TU:
 			sqlText, values, err = mp.getUpdateSQL(entity)
-		case dal.D:
+		case dal.TD:
 			sqlText, values, err = mp.getDeleteSQL(entity)
 		}
 		if err != nil {

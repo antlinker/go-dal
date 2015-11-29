@@ -6,12 +6,12 @@ import "gopkg.in/dal.v1/utils"
 type TranOperate byte
 
 const (
-	// A 新增
-	A TranOperate = 1 << iota
-	// U 更新
-	U
-	// D 删除
-	D
+	// TA 新增
+	TA TranOperate = 1 << iota
+	// TU 更新
+	TU
+	// TD 删除
+	TD
 )
 
 // NewTranAEntity 创建新增实体
@@ -21,7 +21,7 @@ func NewTranAEntity(table string, fieldsValue interface{}) TranEntityResult {
 	var result TranEntityResult
 	entity := TranEntity{
 		Table:   table,
-		Operate: A,
+		Operate: TA,
 	}
 	var fields map[string]interface{}
 	err := utils.NewDecoder(fieldsValue).Decode(&fields)
@@ -40,7 +40,7 @@ func NewTranUEntity(table string, fieldsValue interface{}, cond QueryCondition) 
 	var result TranEntityResult
 	entity := TranEntity{
 		Table:     table,
-		Operate:   U,
+		Operate:   TU,
 		Condition: cond,
 	}
 	var fields map[string]interface{}
@@ -59,7 +59,7 @@ func NewTranDEntity(table string, cond QueryCondition) TranEntityResult {
 	var result TranEntityResult
 	result.Entity = TranEntity{
 		Table:     table,
-		Operate:   D,
+		Operate:   TD,
 		Condition: cond,
 	}
 	return result

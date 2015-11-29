@@ -2,8 +2,8 @@ package dal
 
 // QueryPagerResult 分页查询结果类型
 type QueryPagerResult struct {
-	Rows  []map[string]string `json:"rows"`
-	Total int64               `json:"total"`
+	Rows  []map[string]interface{} `json:"rows"`
+	Total int64                    `json:"total"`
 }
 
 // ResultError 提供统一的错误处理

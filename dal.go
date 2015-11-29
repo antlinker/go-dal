@@ -8,11 +8,13 @@ import (
 type QueryProvider interface {
 	// Single 查询单条数据
 	Single(QueryEntity) (map[string]string, error)
-	// AssignSingle 将查询结果解析到对应的指针地址(数据类型包括：map[string]string,map[string]interface{},struct)
+	// AssignSingle 将查询结果解析到对应的指针地址
+	// (数据类型包括：map[string]string,map[string]interface{},struct)
 	AssignSingle(QueryEntity, interface{}) error
 	// List 查询列表数据
 	List(QueryEntity) ([]map[string]string, error)
-	// AssignList 将查询结果解析到对应的指针地址(数据类型包括：[]map[string]string,[]map[string]interface{},[]struct)
+	// AssignList 将查询结果解析到对应的指针地址
+	// (数据类型包括：[]map[string]string,[]map[string]interface{},[]struct)
 	AssignList(QueryEntity, interface{}) error
 	// Pager 查询分页数据
 	Pager(QueryEntity) (QueryPagerResult, error)
@@ -85,4 +87,47 @@ func RegisterProvider(provideName ProvideEngine, config string) error {
 	}
 	GDAL = provide
 	return nil
+}
+
+// Single 查询单条数据
+func Single(entity QueryEntity) (map[string]string, error) {
+	return GDAL.Single(entity)
+}
+
+// AssignSingle 将查询结果解析到对应的指针地址
+// (数据类型包括：map[string]string,map[string]interface{},struct)
+func AssignSingle(entity QueryEntity, output interface{}) error {
+	return GDAL.AssignSingle(entity, output)
+}
+
+// List 查询列表数据
+func List(entity QueryEntity) ([]map[string]string, error) {
+	return GDAL.List(entity)
+}
+
+// AssignList 将查询结果解析到对应的指针地址
+// (数据类型包括：[]map[string]string,[]map[string]interface{},[]struct)
+func AssignList(entity QueryEntity, output interface{}) error {
+	return GDAL.AssignList(entity, output)
+}
+
+// Pager 查询分页数据
+func Pager(entity QueryEntity) (QueryPagerResult, error) {
+	return GDAL.Pager(entity)
+}
+
+// Query 查询数据
+//（根据QueryResultType返回数据结果类型）
+func Query(entity QueryEntity) (interface{}, error) {
+	return GDAL.Query(entity)
+}
+
+// Exec 执行单条事务性操作
+func Exec(entity TranEntity) TranResult {
+	return GDAL.Exec(entity)
+}
+
+// ExecTrans 执行多条事务性操作
+func ExecTrans(entities []TranEntity) TranResult {
+	return GDAL.ExecTrans(entities)
 }

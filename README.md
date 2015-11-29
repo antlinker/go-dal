@@ -49,7 +49,7 @@ func insert() {
 		Memo:     "Message...",
 	}
 	entity := dal.NewTranAEntity("student", stud).Entity
-	result := dal.GDAL.Exec(entity)
+	result := dal.Exec(entity)
 	if err := result.Error; err != nil {
 		panic(err)
 	}
@@ -64,7 +64,7 @@ func update() {
 	}
 	cond := dal.NewFieldsKvCondition(map[string]interface{}{"StuCode": "S001"}).Condition
 	entity := dal.NewTranUEntity("student", stud, cond).Entity
-	result := dal.GDAL.Exec(entity)
+	result := dal.Exec(entity)
 	if err := result.Error; err != nil {
 		panic(err)
 	}
@@ -74,7 +74,7 @@ func update() {
 func delete() {
 	cond := dal.NewFieldsKvCondition(Student{StuCode: "S001"}).Condition
 	entity := dal.NewTranDEntity("student", cond).Entity
-	result := dal.GDAL.Exec(entity)
+	result := dal.Exec(entity)
 	if err := result.Error; err != nil {
 		panic(err)
 	}
@@ -82,15 +82,54 @@ func delete() {
 }
 
 func list() {
-	entity := dal.NewQueryEntity("student", dal.QueryCondition{}, "*")(dal.List).Entity
+	entity := dal.NewQueryEntity("student", dal.QueryCondition{}, "*")().Entity
 	var stuData []Student
-	err := dal.GDAL.AssignList(entity, &stuData)
+	err := dal.AssignList(entity, &stuData)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("===> Student List:", stuData)
 }
 
+```
+
+## 针对MySQL数据库的事务操作范例
+
+``` go
+func insertManyData() {
+	var entities []dal.TranEntity
+	for i := 0; i < 1000; i++ {
+		var stu Student
+		stu.StuCode = fmt.Sprintf("S-%d", i)
+		stu.StuName = fmt.Sprintf("SName-%d", i)
+		stu.Birthday = time.Now()
+		entities = append(entities, dal.NewTranAEntity("student", stu).Entity)
+	}
+	result := dal.ExecTrans(entities)
+	if err := result.Error; err != nil {
+		panic(err)
+	}
+	fmt.Println("===> Insert data numbers:", result.Result)
+}
+```
+
+## 针对MySQL数据库的分页查询范例
+
+``` go
+func pager() {
+	entity := dal.NewQueryPagerEntity("student",
+		dal.NewCondition("where StuCode like ? order by ID", "S-%").Condition,
+		dal.NewPagerParam(1, 20),
+		"StuCode", "StuName", "Birthday").Entity
+	result, err := dal.Pager(entity)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("===> Query total:")
+	fmt.Println(result.Total)
+	fmt.Println("===> Query rows:")
+	fmt.Println(result.Rows)
+}
 ```
 
 ## License

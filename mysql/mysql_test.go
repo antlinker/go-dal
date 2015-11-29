@@ -51,7 +51,9 @@ func TestUpdate(t *testing.T) {
 		"Sex":     1,
 		"Memo":    "Message",
 	}
-	entityResult := dal.NewTranUEntity("student", student, dal.NewFieldsKvCondition(map[string]interface{}{"StuCode": "S002"}).Condition)
+	entityResult := dal.NewTranUEntity("student",
+		student,
+		dal.NewFieldsKvCondition(map[string]interface{}{"StuCode": "S002"}).Condition)
 	if err := entityResult.Error; err != nil {
 		t.Error(err)
 		return
@@ -66,7 +68,7 @@ func TestUpdate(t *testing.T) {
 
 func TestQueryList(t *testing.T) {
 	db := getDB()
-	entity := dal.NewQueryEntity("student", dal.NewCondition("").Condition)(dal.List)
+	entity := dal.NewQueryEntity("student", dal.NewCondition("").Condition)()
 	var studs []Student
 	err := db.AssignList(entity.Entity, &studs)
 	if err != nil {

@@ -93,12 +93,12 @@ func (mp *MysqlProvider) parseQuerySQL(entity dal.QueryEntity) (sqlText []string
 
 	querySQL := fmt.Sprintf("SELECT %s FROM %s %s", entity.FieldsSelect, entity.Table, condSQL)
 	switch entity.ResultType {
-	case dal.Single:
+	case dal.QSingle:
 		sqlText = append(sqlText, fmt.Sprintf("SELECT * FROM (%s) AS NewTable LIMIT 1", querySQL))
-	case dal.Pager:
+	case dal.QPager:
 		pageSize := entity.PagerParam.PageSize
 		pageIndex := entity.PagerParam.PageIndex
-		sqlText = append(sqlText, fmt.Sprintf("SELECT * FROM (%s) AS NewTable LIMIT %d,%d", querySQL, (pageIndex-1)*pageSize+1, pageSize))
+		sqlText = append(sqlText, fmt.Sprintf("SELECT * FROM (%s) AS NewTable LIMIT %d,%d", querySQL, (pageIndex-1)*pageSize, pageSize))
 		sqlText = append(sqlText, fmt.Sprintf("SELECT COUNT(*) 'Count' FROM %s %s", entity.Table, condSQL))
 	default:
 		sqlText = append(sqlText, querySQL)

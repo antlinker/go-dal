@@ -6,12 +6,12 @@ import "strings"
 type QueryResultType byte
 
 const (
-	// Single 单条数据
-	Single QueryResultType = 1 << iota
-	// List 列表数据
-	List
-	// Pager 分页数据
-	Pager
+	// QSingle 单条数据
+	QSingle QueryResultType = 1 << iota
+	// QList 列表数据
+	QList
+	// QPager 分页数据
+	QPager
 )
 
 // NewQueryEntity 创建新的查询实体
@@ -38,7 +38,7 @@ func NewQueryPagerEntity(table string, cond QueryCondition, pagerParam PagerPara
 		Table:        table,
 		FieldsSelect: strings.Join(fields, ","),
 		Condition:    cond,
-		ResultType:   Pager,
+		ResultType:   QPager,
 		PagerParam:   pagerParam,
 	}
 	return result
