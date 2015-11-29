@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -22,15 +24,28 @@ var (
 )
 
 type Config struct {
-	DataSource   string `json:"datasource"`
-	MaxOpenConns int    `json:"maxopen"`
-	MaxIdleConns int    `json:"maxidle"`
+	// DataSource 数据库连接
+	DataSource string `json:"datasource"`
+	// MaxOpenConns 打开最大连接数
+	MaxOpenConns int `json:"maxopen"`
+	// MaxIdleConns 连接池保持连接数量
+	MaxIdleConns int `json:"maxidle"`
+	// IsPrint 是否打印SQL
+	IsPrint bool `json:"print"`
 }
 
-type MysqlProvider struct{}
+type MysqlProvider struct {
+	config Config
+	lg     *log.Logger
+}
 
 func (mp *MysqlProvider) Error(errInfo string) error {
-	return fmt.Errorf("[go-dal:mysql:mysql.go]%s", errInfo)
+	return fmt.Errorf("[go-dal:mysql]%s", errInfo)
+}
+
+func (mp *MysqlProvider) PrintSQL(query string, values ...interface{}) {
+	msg := fmt.Sprintf("Query SQL:\n%s \nQuery Params:%v", query, values)
+	mp.lg.Println(msg)
 }
 
 func (mp *MysqlProvider) InitDB(config string) error {
@@ -53,6 +68,8 @@ func (mp *MysqlProvider) InitDB(config string) error {
 		cfg.MaxIdleConns = DefaultMaxIdleConns
 	}
 	db.SetMaxIdleConns(cfg.MaxIdleConns)
+	mp.config = cfg
+	mp.lg = log.New(os.Stdout, "[go-dal-mysql]", log.Ltime)
 	GDB = db
 	return nil
 }
@@ -62,6 +79,9 @@ func (mp *MysqlProvider) Single(entity dal.QueryEntity) (map[string]string, erro
 		entity.ResultType = dal.QSingle
 	}
 	sqlText, values := mp.parseQuerySQL(entity)
+	if mp.config.IsPrint {
+		mp.PrintSQL(sqlText[0], values...)
+	}
 	data, err := mp.queryData(sqlText[0], values...)
 	if err != nil {
 		return nil, mp.Error(err.Error())
@@ -77,7 +97,7 @@ func (mp *MysqlProvider) AssignSingle(entity dal.QueryEntity, output interface{}
 	if err != nil {
 		return err
 	}
-	return utils.NewDecoder(data).Decode(output)
+	return utils.NewDecoder(&data).Decode(output)
 }
 
 func (mp *MysqlProvider) List(entity dal.QueryEntity) ([]map[string]string, error) {
@@ -85,6 +105,9 @@ func (mp *MysqlProvider) List(entity dal.QueryEntity) ([]map[string]string, erro
 		entity.ResultType = dal.QList
 	}
 	sqlText, values := mp.parseQuerySQL(entity)
+	if mp.config.IsPrint {
+		mp.PrintSQL(sqlText[0], values...)
+	}
 	data, err := mp.queryData(sqlText[0], values...)
 	if err != nil {
 		return nil, mp.Error(err.Error())
@@ -98,7 +121,7 @@ func (mp *MysqlProvider) AssignList(entity dal.QueryEntity, output interface{}) 
 	if err != nil {
 		return err
 	}
-	return utils.NewDecoder(data).Decode(output)
+	return utils.NewDecoder(&data).Decode(output)
 }
 
 func (mp *MysqlProvider) Pager(entity dal.QueryEntity) (dal.QueryPagerResult, error) {
@@ -107,6 +130,10 @@ func (mp *MysqlProvider) Pager(entity dal.QueryEntity) (dal.QueryPagerResult, er
 		entity.ResultType = dal.QPager
 	}
 	sqlText, values := mp.parseQuerySQL(entity)
+	if mp.config.IsPrint {
+		mp.PrintSQL(sqlText[0], values...)
+		mp.PrintSQL(sqlText[1], values...)
+	}
 	var (
 		errs []error
 		mux  = new(sync.RWMutex)
@@ -190,6 +217,9 @@ func (mp *MysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
 	if err != nil {
 		result.Error = err
 	}
+	if mp.config.IsPrint {
+		mp.PrintSQL(sqlText, values...)
+	}
 	sqlResult, err := GDB.Exec(sqlText, values...)
 	if err != nil {
 		result.Error = mp.Error(err.Error())
@@ -234,6 +264,9 @@ func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranRe
 		}
 		if err != nil {
 			break
+		}
+		if mp.config.IsPrint {
+			mp.PrintSQL(sqlText, values...)
 		}
 		sqlResult, err := tx.Exec(sqlText, values...)
 		if err != nil {

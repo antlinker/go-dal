@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"bytes"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -108,50 +107,36 @@ func (mp *MysqlProvider) parseQuerySQL(entity dal.QueryEntity) (sqlText []string
 	return
 }
 
-func (mp *MysqlProvider) parseQueryRows(rows *sql.Rows) ([]map[string]sql.RawBytes, error) {
+func (mp *MysqlProvider) parseQueryRows(rows *sql.Rows) (datas []map[string]string, err error) {
 	columns, err := rows.Columns()
 	if err != nil {
-		return nil, err
+		return
 	}
 	var (
-		datas []map[string]sql.RawBytes
-		l     = len(columns)
+		l = len(columns)
 	)
-	values := make([]sql.RawBytes, l)
+	scanValues := make([]interface{}, l)
 	scanArgs := make([]interface{}, l)
 	for i := 0; i < l; i++ {
-		scanArgs[i] = &values[i]
+		scanArgs[i] = &scanValues[i]
 	}
 	for rows.Next() {
-		if err := rows.Scan(scanArgs...); err != nil {
-			return nil, err
+		if err = rows.Scan(scanArgs...); err != nil {
+			return
 		}
-		data := make(map[string]sql.RawBytes)
+		data := make(map[string]string)
 		for i := 0; i < l; i++ {
-			data[columns[i]] = values[i]
+			var value string
+			if scanValues[i] != nil {
+				if v, ok := scanValues[i].([]byte); ok {
+					value = string(v)
+				}
+			}
+			data[columns[i]] = value
 		}
 		datas = append(datas, data)
 	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return datas, nil
-}
-
-func (mp *MysqlProvider) convQueryData(data *[]map[string]sql.RawBytes) (rData []map[string]string) {
-	l := len(*data)
-	rData = make([]map[string]string, l)
-	for i := 0; i < l; i++ {
-		rItem := make(map[string]string)
-		for k, v := range (*data)[i] {
-			var val string
-			if v != nil {
-				val = bytes.NewBuffer(v).String()
-			}
-			rItem[k] = val
-		}
-		rData[i] = rItem
-	}
+	err = rows.Err()
 	return
 }
 
@@ -168,6 +153,5 @@ func (mp *MysqlProvider) queryData(query string, values ...interface{}) ([]map[s
 	if len(datas) == 0 {
 		return make([]map[string]string, 0), nil
 	}
-	rData := mp.convQueryData(&datas)
-	return rData, nil
+	return datas, nil
 }

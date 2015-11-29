@@ -23,15 +23,15 @@ func main() {
 		`{
 		"datasource":"root:123456@tcp(127.0.0.1:3306)/testdb?charset=utf8",
 		"maxopen":100,
-		"maxidle":50
+		"maxidle":50,
+		"print":true
 	}`)
 	// insert()
 	// update()
 	// delete()
 	// transaction()
-	// list()
+	list()
 	// single()
-	// pager()
 	// insertManyData()
 	// pager()
 }
@@ -100,13 +100,18 @@ func single() {
 }
 
 func list() {
-	entity := dal.NewQueryEntity("student", dal.QueryCondition{}, "*")().Entity
+	entity := dal.NewQueryEntity("student",
+		dal.NewCondition("order by Id limit 10").Condition,
+		"Id", "StuCode", "StuName")().Entity
+
 	var stuData []Student
 	err := dal.AssignList(entity, &stuData)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("===> Student List:", stuData)
+	for i, item := range stuData {
+		fmt.Println(i+1, ",Student data:", item.ID, item.StuCode, item.StuName)
+	}
 }
 
 func transaction() {

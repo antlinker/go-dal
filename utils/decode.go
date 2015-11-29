@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var TimeFormats = []string{"1/2/2006", "1/2/2006 15:4:5", "2006-1-2 15:4:5", "2006-1-2 15:4", "2006-1-2", "1-2", "15:4:5", "15:4", "15", "15:4:5 Jan 2, 2006 MST"}
+
 // Decoder is the interface that wraps the basic Read method.
 type Decoder interface {
 	// Decode data type conversion
@@ -51,10 +53,7 @@ func (d *decoder) getKind(val reflect.Value) reflect.Kind {
 }
 
 func (d *decoder) decode(data interface{}, outputValue reflect.Value) (err error) {
-	if data == nil {
-		return
-	}
-	dataVal := reflect.ValueOf(data)
+	dataVal := reflect.Indirect(reflect.ValueOf(data))
 	if !dataVal.IsValid() {
 		outputValue.Set(reflect.Zero(outputValue.Type()))
 		return
@@ -71,7 +70,12 @@ func (d *decoder) decode(data interface{}, outputValue reflect.Value) (err error
 	case reflect.Float32:
 		err = d.decodeFloat(data, outputValue)
 	case reflect.Struct:
-		err = d.decodeStruct(data, outputValue)
+		switch outputType := outputValue.Type().String(); outputType {
+		case "time.Time":
+			err = d.decodeTime(data, outputValue)
+		default:
+			err = d.decodeStruct(data, outputValue)
+		}
 	case reflect.Map:
 		err = d.decodeMap(data, outputValue)
 	case reflect.Slice:
@@ -301,18 +305,15 @@ func (d *decoder) decodeMap(data interface{}, val reflect.Value) error {
 
 func (d *decoder) decodeSlice(data interface{}, val reflect.Value) error {
 	dataVal := reflect.Indirect(reflect.ValueOf(data))
-
 	if dataVal.Kind() != reflect.Slice {
 		return fmt.Errorf("Expected type slice")
 	}
-
 	if dataVal.Type() == val.Type() {
 		val.Set(dataVal)
 		return nil
 	}
-
 	valSlice := reflect.MakeSlice(reflect.SliceOf(val.Type().Elem()), dataVal.Len(), dataVal.Len())
-	for i := 0; i < dataVal.Len(); i++ {
+	for i, l := 0, dataVal.Len(); i < l; i++ {
 		currentData := dataVal.Index(i).Interface()
 		currentField := valSlice.Index(i)
 		if err := d.decode(currentData, currentField); err != nil {
@@ -327,55 +328,66 @@ func (d *decoder) decodeSlice(data interface{}, val reflect.Value) error {
 func (d *decoder) decodeStruct(data interface{}, val reflect.Value) error {
 	dataVal := reflect.Indirect(reflect.ValueOf(data))
 	valType := val.Type()
-
 	if dataVal.Type() == valType {
 		val.Set(dataVal)
 		return nil
 	}
-
 	if kind := dataVal.Kind(); kind != reflect.Map {
 		return fmt.Errorf("Expected a map, got '%s'", kind.String())
 	}
-
-	for _, dataKey := range dataVal.MapKeys() {
-		name := dataKey.String()
-		for i, l := 0, valType.NumField(); i < l; i++ {
-			tField := valType.Field(i)
-			if strings.ToUpper(name) == strings.ToUpper(tField.Name) {
-				field := val.Field(i)
-				if !field.CanSet() {
-					break
-				}
-				mVal := dataVal.MapIndex(dataKey).Interface()
-				if tField.Type.String() == "time.Time" {
-					if v, ok := mVal.(string); ok && v != "" {
-						format := time.RFC3339
-						switch {
-						case len(v) == 4:
-							format = "2006"
-						case len(v) > 4 && len(v) < 10:
-							format = "2006-01"
-						case len(v) == 10:
-							format = "2006-01-02"
-						}
-						t, err := time.Parse(format, v)
-						if err != nil {
-							return err
-						}
-						field.Set(reflect.ValueOf(t))
-					} else if v, ok := mVal.(time.Time); ok {
-						field.Set(reflect.ValueOf(v))
-					}
+	for i, l := 0, valType.NumField(); i < l; i++ {
+		fieldName := valType.Field(i).Name
+		rawMapKey := reflect.ValueOf(fieldName)
+		rawMapValue := dataVal.MapIndex(rawMapKey)
+		if !rawMapValue.IsValid() {
+			dataValKeys := dataVal.MapKeys()
+			for j, jl := 0, len(dataValKeys); j < jl; j++ {
+				rawMapKeyName, ok := dataValKeys[j].Interface().(string)
+				if !ok {
 					continue
 				}
-				err := d.decode(mVal, field)
-				if err != nil {
-					return err
+				if strings.EqualFold(fieldName, rawMapKeyName) {
+					rawMapKey = dataValKeys[j]
+					rawMapValue = dataVal.MapIndex(dataValKeys[j])
+					break
 				}
 			}
+			if !rawMapValue.IsValid() {
+				continue
+			}
+		}
+		field := val.Field(i)
+		if !field.CanSet() {
+			continue
+		}
+		if err := d.decode(rawMapValue.Interface(), field); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
+func (d *decoder) decodeTime(data interface{}, val reflect.Value) error {
+	var tVal time.Time
+	if v, ok := data.(string); ok && v != "" {
+		var exist bool
+		for i, l := 0, len(TimeFormats); i < l; i++ {
+			t, err := time.Parse(TimeFormats[i], v)
+			if err == nil {
+				tVal = t
+				exist = true
+				break
+			}
+		}
+		if !exist {
+			return fmt.Errorf("Unknown time format.")
+		}
+	} else if v, ok := data.(time.Time); ok {
+		tVal = v
+	} else {
+		tVal = time.Now()
+	}
+	val.Set(reflect.ValueOf(tVal))
 	return nil
 }
 

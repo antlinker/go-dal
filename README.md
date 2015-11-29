@@ -32,7 +32,7 @@ type Student struct {
 }
 
 func main() {
-	dal.RegisterProvider(dal.MYSQL, `{"datasource":"root:123456@tcp(127.0.0.1:3306)/testdb?charset=utf8","maxopen":100,"maxidle":50}`)
+	dal.RegisterProvider(dal.MYSQL, `{"datasource":"root:123456@tcp(127.0.0.1:3306)/testdb?charset=utf8","maxopen":100,"maxidle":50,"print":true}`)
 	insert()
 	update()
 	delete()
@@ -129,6 +129,21 @@ func pager() {
 	fmt.Println(result.Total)
 	fmt.Println("===> Query rows:")
 	fmt.Println(result.Rows)
+}
+```
+
+## MySql配置信息
+
+``` go
+type Config struct {
+	// DataSource 数据库连接
+	DataSource string `json:"datasource"`
+	// MaxOpenConns 打开最大连接数
+	MaxOpenConns int `json:"maxopen"`
+	// MaxIdleConns 连接池保持连接数量
+	MaxIdleConns int `json:"maxidle"`
+	// IsPrint 是否打印SQL
+	IsPrint bool `json:"print"`
 }
 ```
 
