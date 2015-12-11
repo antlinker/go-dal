@@ -60,6 +60,10 @@ func (mp *MysqlProvider) InitDB(config string) error {
 	if err != nil {
 		return mp.Error(err.Error())
 	}
+	err = db.Ping()
+	if err != nil {
+		return err
+	}
 	if v := cfg.MaxOpenConns; v < 0 {
 		cfg.MaxOpenConns = DefaultMaxOpenConns
 	}
