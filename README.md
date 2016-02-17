@@ -5,7 +5,7 @@
 ## 获取
 
 ``` bash
-$ go get gopkg.in/dal.v1
+$ go get github.com/antlinker/go-dal
 ```
 
 ## 针对MySQL数据库的CRUD范例
@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/dal.v1"
-	_ "gopkg.in/dal.v1/mysql"
+	"github.com/antlinker/go-dal"
+	_ "github.com/antlinker/go-dal/mysql"
 )
 
 type Student struct {

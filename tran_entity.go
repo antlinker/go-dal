@@ -1,6 +1,6 @@
 package dal
 
-import "gopkg.in/dal.v1/utils"
+import "github.com/antlinker/go-dal/utils"
 
 // TranOperate 操作
 type TranOperate byte

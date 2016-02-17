@@ -5,7 +5,8 @@ import (
 	"time"
 
 	"gopkg.in/dal.v1"
-	_ "gopkg.in/dal.v1/mysql"
+
+	_ "github.com/antlinker/go-dal/mysql"
 )
 
 type Student struct {

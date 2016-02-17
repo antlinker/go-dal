@@ -9,9 +9,10 @@ import (
 	"os"
 	"sync"
 
-	_ "github.com/go-sql-driver/mysql"
 	"gopkg.in/dal.v1"
-	"gopkg.in/dal.v1/utils"
+
+	"github.com/antlinker/go-dal/utils"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 const (

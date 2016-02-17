@@ -3,7 +3,7 @@ package dal
 import (
 	"errors"
 
-	"gopkg.in/dal.v1/utils"
+	"github.com/antlinker/go-dal/utils"
 )
 
 var (
