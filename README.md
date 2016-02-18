@@ -142,6 +142,8 @@ type Config struct {
 	MaxOpenConns int `json:"maxopen"`
 	// MaxIdleConns 连接池保持连接数量
 	MaxIdleConns int `json:"maxidle"`
+	// ConnMaxLifetime 连接池的生命周期
+	ConnMaxLifetime time.Duration `json:"maxlifetime"`
 	// IsPrint 是否打印SQL
 	IsPrint bool `json:"print"`
 }

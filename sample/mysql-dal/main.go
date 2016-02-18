@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/dal.v1"
+	"github.com/antlinker/go-dal"
 
 	_ "github.com/antlinker/go-dal/mysql"
 )

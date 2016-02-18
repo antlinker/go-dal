@@ -1,0 +1,11 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/go-sql-driver/mysql",
+			"repository": "https://github.com/go-sql-driver/mysql",
+			"revision": "1309049fd598c1faa0290fd70ab1afde2b6df0f9",
+			"branch": "master"
+		}
+	]
+}

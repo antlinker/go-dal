@@ -8,16 +8,18 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
-	"gopkg.in/dal.v1"
-
+	"github.com/antlinker/go-dal"
 	"github.com/antlinker/go-dal/utils"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
 const (
-	DefaultMaxOpenConns = 0
-	DefaultMaxIdleConns = 500
+	DefaultMaxOpenConns    = 0
+	DefaultMaxIdleConns    = 500
+	DefaultConnMaxLifetime = time.Hour * 2
 )
 
 var (
@@ -31,6 +33,8 @@ type Config struct {
 	MaxOpenConns int `json:"maxopen"`
 	// MaxIdleConns 连接池保持连接数量
 	MaxIdleConns int `json:"maxidle"`
+	// ConnMaxLifetime 连接池的生命周期
+	ConnMaxLifetime time.Duration `json:"maxlifetime"`
 	// IsPrint 是否打印SQL
 	IsPrint bool `json:"print"`
 }
@@ -69,10 +73,14 @@ func (mp *MysqlProvider) InitDB(config string) error {
 		cfg.MaxOpenConns = DefaultMaxOpenConns
 	}
 	db.SetMaxOpenConns(cfg.MaxOpenConns)
-	if v := cfg.MaxIdleConns; v < 0 {
+	if v := cfg.MaxIdleConns; v <= 0 {
 		cfg.MaxIdleConns = DefaultMaxIdleConns
 	}
 	db.SetMaxIdleConns(cfg.MaxIdleConns)
+	if v := cfg.ConnMaxLifetime; v <= 0 {
+		cfg.ConnMaxLifetime = DefaultConnMaxLifetime
+	}
+	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 	mp.config = cfg
 	mp.lg = log.New(os.Stdout, "[go-dal-mysql]", log.Ltime)
 	GDB = db

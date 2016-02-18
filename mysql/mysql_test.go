@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/dal.v1"
+	"github.com/antlinker/go-dal"
 )
 
 type Student struct {

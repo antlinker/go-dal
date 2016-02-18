@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/dal.v1"
+	"github.com/antlinker/go-dal"
 )
 
 func (mp *MysqlProvider) getInsertSQL(entity dal.TranEntity) (sqlText string, values []interface{}, err error) {
