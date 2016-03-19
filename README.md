@@ -138,11 +138,11 @@ func pager() {
 type Config struct {
 	// DataSource 数据库连接
 	DataSource string `json:"datasource"`
-	// MaxOpenConns 打开最大连接数
+	// MaxOpenConns 打开最大连接数(默认无限制)
 	MaxOpenConns int `json:"maxopen"`
-	// MaxIdleConns 连接池保持连接数量
+	// MaxIdleConns 连接池保持连接数量(默认500)
 	MaxIdleConns int `json:"maxidle"`
-	// ConnMaxLifetime 连接池的生命周期
+	// ConnMaxLifetime 连接池的生命周期(默认2小时)
 	ConnMaxLifetime time.Duration `json:"maxlifetime"`
 	// IsPrint 是否打印SQL
 	IsPrint bool `json:"print"`
