@@ -4,28 +4,32 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/antlinker/go-dal"
 	"github.com/antlinker/go-dal/utils"
 
+	// 引入mysql驱动
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// 定义默认值
 const (
 	DefaultMaxOpenConns    = 0
 	DefaultMaxIdleConns    = 500
 	DefaultConnMaxLifetime = time.Hour * 2
 )
 
+// 定义全局变量
 var (
 	GDB *sql.DB
 )
 
+// Config 配置参数
 type Config struct {
 	// DataSource 数据库连接
 	DataSource string `json:"datasource"`
@@ -39,31 +43,27 @@ type Config struct {
 	IsPrint bool `json:"print"`
 }
 
-type MysqlProvider struct {
+type mysqlProvider struct {
 	config Config
 	lg     *log.Logger
 }
 
-func (mp *MysqlProvider) Error(errInfo string) error {
-	return fmt.Errorf("[go-dal:mysql]%s", errInfo)
-}
-
-func (mp *MysqlProvider) PrintSQL(query string, values ...interface{}) {
+func (mp *mysqlProvider) PrintSQL(query string, values ...interface{}) {
 	msg := fmt.Sprintf("Query SQL:\n%s \nQuery Params:%v", query, values)
 	mp.lg.Println(msg)
 }
 
-func (mp *MysqlProvider) InitDB(config string) error {
+func (mp *mysqlProvider) InitDB(config string) error {
 	var cfg Config
 	if err := json.NewDecoder(bytes.NewBufferString(config)).Decode(&cfg); err != nil {
-		return mp.Error(err.Error())
+		return err
 	}
 	if cfg.DataSource == "" {
-		return mp.Error("`datasource` can't be empty!")
+		return errors.New("`datasource` can't be empty")
 	}
 	db, err := sql.Open("mysql", cfg.DataSource)
 	if err != nil {
-		return mp.Error(err.Error())
+		return err
 	}
 	err = db.Ping()
 	if err != nil {
@@ -87,7 +87,7 @@ func (mp *MysqlProvider) InitDB(config string) error {
 	return nil
 }
 
-func (mp *MysqlProvider) Single(entity dal.QueryEntity) (map[string]string, error) {
+func (mp *mysqlProvider) Single(entity dal.QueryEntity) (map[string]string, error) {
 	if entity.ResultType != dal.QSingle {
 		entity.ResultType = dal.QSingle
 	}
@@ -97,7 +97,7 @@ func (mp *MysqlProvider) Single(entity dal.QueryEntity) (map[string]string, erro
 	}
 	data, err := mp.queryData(sqlText[0], values...)
 	if err != nil {
-		return nil, mp.Error(err.Error())
+		return nil, err
 	}
 	if len(data) == 0 {
 		return make(map[string]string), nil
@@ -105,7 +105,21 @@ func (mp *MysqlProvider) Single(entity dal.QueryEntity) (map[string]string, erro
 	return data[0], nil
 }
 
-func (mp *MysqlProvider) AssignSingle(entity dal.QueryEntity, output interface{}) error {
+func (mp *mysqlProvider) SingleWithSQL(sql string, values ...interface{}) (data map[string]string, err error) {
+	if mp.config.IsPrint {
+		mp.PrintSQL(sql, values...)
+	}
+	datas, err := mp.queryData(sql, values...)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > 0 {
+		data = datas[0]
+	}
+	return
+}
+
+func (mp *mysqlProvider) AssignSingle(entity dal.QueryEntity, output interface{}) error {
 	data, err := mp.Single(entity)
 	if err != nil {
 		return err
@@ -113,7 +127,24 @@ func (mp *MysqlProvider) AssignSingle(entity dal.QueryEntity, output interface{}
 	return utils.NewDecoder(&data).Decode(output)
 }
 
-func (mp *MysqlProvider) List(entity dal.QueryEntity) ([]map[string]string, error) {
+func (mp *mysqlProvider) AssignSingleWithSQL(sql string, values []interface{}, output interface{}) (err error) {
+	data, err := mp.SingleWithSQL(sql, values...)
+	if err != nil {
+		return
+	}
+	err = utils.NewDecoder(&data).Decode(output)
+	return
+}
+
+func (mp *mysqlProvider) ListWithSQL(sql string, values ...interface{}) (data []map[string]string, err error) {
+	if mp.config.IsPrint {
+		mp.PrintSQL(sql, values...)
+	}
+	data, err = mp.queryData(sql, values...)
+	return
+}
+
+func (mp *mysqlProvider) List(entity dal.QueryEntity) ([]map[string]string, error) {
 	if entity.ResultType != dal.QList {
 		entity.ResultType = dal.QList
 	}
@@ -123,13 +154,13 @@ func (mp *MysqlProvider) List(entity dal.QueryEntity) ([]map[string]string, erro
 	}
 	data, err := mp.queryData(sqlText[0], values...)
 	if err != nil {
-		return nil, mp.Error(err.Error())
+		return nil, err
 	}
 
 	return data, nil
 }
 
-func (mp *MysqlProvider) AssignList(entity dal.QueryEntity, output interface{}) error {
+func (mp *mysqlProvider) AssignList(entity dal.QueryEntity, output interface{}) error {
 	data, err := mp.List(entity)
 	if err != nil {
 		return err
@@ -137,67 +168,59 @@ func (mp *MysqlProvider) AssignList(entity dal.QueryEntity, output interface{}) 
 	return utils.NewDecoder(&data).Decode(output)
 }
 
-func (mp *MysqlProvider) Pager(entity dal.QueryEntity) (dal.QueryPagerResult, error) {
-	var qResult dal.QueryPagerResult
+func (mp *mysqlProvider) AssignListWithSQL(sql string, values []interface{}, output interface{}) (err error) {
+	if mp.config.IsPrint {
+		mp.PrintSQL(sql, values...)
+	}
+	data, err := mp.queryData(sql, values...)
+	if err != nil {
+		return
+	}
+	err = utils.NewDecoder(&data).Decode(output)
+	return
+}
+
+func (mp *mysqlProvider) Pager(entity dal.QueryEntity) (qResult dal.QueryPagerResult, err error) {
 	if entity.ResultType != dal.QPager {
 		entity.ResultType = dal.QPager
 	}
+
 	sqlText, values := mp.parseQuerySQL(entity)
+
+	var count int64
 	if mp.config.IsPrint {
-		mp.PrintSQL(sqlText[0], values...)
 		mp.PrintSQL(sqlText[1], values...)
 	}
-	var (
-		errs []error
-		mux  = new(sync.RWMutex)
-		wg   = new(sync.WaitGroup)
-	)
-	wg.Add(2)
+	row := GDB.QueryRow(sqlText[1], values...)
+	err = row.Scan(&count)
+	if err != nil {
+		return
+	} else if count == 0 {
+		return
+	}
+	qResult.Total = count
 
-	go func(result *dal.QueryPagerResult, errs *[]error) {
-		defer wg.Done()
-		rData := make([]map[string]interface{}, 0)
-		data, err := mp.queryData(sqlText[0], values...)
-		mux.Lock()
-		defer mux.Unlock()
-		if err != nil {
-			*errs = append(*errs, err)
-			return
-		}
-		if len(data) > 0 {
-			err = utils.NewDecoder(data).Decode(&rData)
-			if err != nil {
-				*errs = append(*errs, err)
-				return
-			}
-		}
-		(*result).Rows = rData
-	}(&qResult, &errs)
-
-	go func(result *dal.QueryPagerResult, errs *[]error) {
-		defer wg.Done()
-		var count int64
-		row := GDB.QueryRow(sqlText[1], values...)
-		err := row.Scan(&count)
-		mux.Lock()
-		defer mux.Unlock()
-		if err != nil {
-			*errs = append(*errs, err)
-			return
-		}
-		(*result).Total = count
-	}(&qResult, &errs)
-
-	wg.Wait()
-
-	if len(errs) > 0 {
-		return qResult, mp.Error(errs[0].Error())
+	if mp.config.IsPrint {
+		mp.PrintSQL(sqlText[0], values...)
 	}
 
-	return qResult, nil
+	rData := make([]map[string]interface{}, 0)
+	data, err := mp.queryData(sqlText[0], values...)
+	if err != nil {
+		return
+	}
+	if len(data) > 0 {
+		err = utils.NewDecoder(data).Decode(&rData)
+		if err != nil {
+			return
+		}
+	}
+	qResult.Rows = rData
+
+	return
 }
 
-func (mp *MysqlProvider) Query(entity dal.QueryEntity) (interface{}, error) {
+func (mp *mysqlProvider) Query(entity dal.QueryEntity) (interface{}, error) {
 	switch entity.ResultType {
 	case dal.QSingle:
 		return mp.Single(entity)
@@ -206,12 +229,12 @@ func (mp *MysqlProvider) Query(entity dal.QueryEntity) (interface{}, error) {
 	case dal.QPager:
 		return mp.Pager(entity)
 	}
-	return nil, mp.Error("The unknown `ResultType`")
+	return nil, errors.New("The unknown `ResultType`")
 }
 
-func (mp *MysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
+func (mp *mysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
 	if entity.Table == "" {
-		result.Error = mp.Error("`Table` can't be empty!")
+		result.Error = errors.New("`Table` can't be empty")
 		return
 	}
 	var (
@@ -235,7 +258,7 @@ func (mp *MysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
 	}
 	sqlResult, err := GDB.Exec(sqlText, values...)
 	if err != nil {
-		result.Error = mp.Error(err.Error())
+		result.Error = err
 		return
 	}
 	if entity.Operate == dal.TA {
@@ -244,14 +267,14 @@ func (mp *MysqlProvider) Exec(entity dal.TranEntity) (result dal.TranResult) {
 		result.Result, err = sqlResult.RowsAffected()
 	}
 	if err != nil {
-		result.Error = mp.Error(err.Error())
+		result.Error = err
 	}
 	return
 }
 
-func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranResult) {
+func (mp *mysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranResult) {
 	if len(entities) == 0 {
-		result.Error = mp.Error("`entities` can't be empty!")
+		result.Error = errors.New("`entities` can't be empty")
 		return
 	}
 	var (
@@ -262,7 +285,7 @@ func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranRe
 	)
 	tx, err := GDB.Begin()
 	if err != nil {
-		result.Error = mp.Error(err.Error())
+		result.Error = err
 		return
 	}
 	for i, l := 0, len(entities); i < l; i++ {
@@ -290,7 +313,7 @@ func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranRe
 	}
 	if err != nil {
 		tx.Rollback()
-		result.Error = mp.Error(err.Error())
+		result.Error = err
 		return
 	}
 	tx.Commit()
@@ -299,5 +322,5 @@ func (mp *MysqlProvider) ExecTrans(entities []dal.TranEntity) (result dal.TranRe
 }
 
 func init() {
-	dal.RegisterDBProvider(dal.MYSQL, new(MysqlProvider))
+	dal.RegisterDBProvider(dal.MYSQL, new(mysqlProvider))
 }

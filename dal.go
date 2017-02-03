@@ -6,20 +6,29 @@ import (
 
 // QueryProvider 提供数据库查询接口
 type QueryProvider interface {
-	// Single 查询单条数据
-	Single(QueryEntity) (map[string]string, error)
-	// AssignSingle 将查询结果解析到对应的指针地址
+	// 查询单条数据
+	Single(entity QueryEntity) (map[string]string, error)
+	// 查询单条数据
+	SingleWithSQL(sql string, values ...interface{}) (map[string]string, error)
+	// 将查询结果解析到对应的指针地址
 	// (数据类型包括：map[string]string,map[string]interface{},struct)
-	AssignSingle(QueryEntity, interface{}) error
-	// List 查询列表数据
-	List(QueryEntity) ([]map[string]string, error)
-	// AssignList 将查询结果解析到对应的指针地址
+	AssignSingle(entity QueryEntity, output interface{}) error
+	// 将查询结果解析到对应的指针地址
+	// (数据类型包括：map[string]string,map[string]interface{},struct)
+	AssignSingleWithSQL(sql string, values []interface{}, output interface{}) error
+	// 查询列表数据
+	List(entity QueryEntity) ([]map[string]string, error)
+	// 使用sql查询数据列表
+	ListWithSQL(sql string, values ...interface{}) ([]map[string]string, error)
+	// 将查询结果解析到对应的指针地址
 	// (数据类型包括：[]map[string]string,[]map[string]interface{},[]struct)
-	AssignList(QueryEntity, interface{}) error
-	// Pager 查询分页数据
-	Pager(QueryEntity) (QueryPagerResult, error)
-	// Query 查询数据（根据QueryResultType返回数据结果类型）
-	Query(QueryEntity) (interface{}, error)
+	AssignList(entity QueryEntity, output interface{}) error
+	// 使用sql查询数据列表
+	AssignListWithSQL(sql string, values []interface{}, output interface{}) error
+	// 查询分页数据
+	Pager(entity QueryEntity) (QueryPagerResult, error)
+	// 查询数据（根据QueryResultType返回数据结果类型）
+	Query(entity QueryEntity) (interface{}, error)
 }
 
 // TranProvider 提供数据库事务操作
@@ -94,10 +103,21 @@ func Single(entity QueryEntity) (map[string]string, error) {
 	return GDAL.Single(entity)
 }
 
+// SingleWithSQL 查询单条数据
+func SingleWithSQL(sql string, values ...interface{}) (map[string]string, error) {
+	return GDAL.SingleWithSQL(sql, values...)
+}
+
 // AssignSingle 将查询结果解析到对应的指针地址
 // (数据类型包括：map[string]string,map[string]interface{},struct)
 func AssignSingle(entity QueryEntity, output interface{}) error {
 	return GDAL.AssignSingle(entity, output)
+}
+
+// AssignSingleWithSQL 将查询结果解析到对应的指针地址
+// (数据类型包括：map[string]string,map[string]interface{},struct)
+func AssignSingleWithSQL(sql string, values []interface{}, output interface{}) error {
+	return GDAL.AssignSingleWithSQL(sql, values, output)
 }
 
 // List 查询列表数据
@@ -105,10 +125,21 @@ func List(entity QueryEntity) ([]map[string]string, error) {
 	return GDAL.List(entity)
 }
 
+// ListWithSQL 查询列表数据
+func ListWithSQL(sql string, values ...interface{}) ([]map[string]string, error) {
+	return GDAL.ListWithSQL(sql, values...)
+}
+
 // AssignList 将查询结果解析到对应的指针地址
 // (数据类型包括：[]map[string]string,[]map[string]interface{},[]struct)
 func AssignList(entity QueryEntity, output interface{}) error {
 	return GDAL.AssignList(entity, output)
+}
+
+// AssignListWithSQL 将查询结果解析到对应的指针地址
+// (数据类型包括：[]map[string]string,[]map[string]interface{},[]struct)
+func AssignListWithSQL(sql string, values []interface{}, output interface{}) error {
+	return GDAL.AssignListWithSQL(sql, values, output)
 }
 
 // Pager 查询分页数据

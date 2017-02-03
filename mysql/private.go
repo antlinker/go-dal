@@ -2,15 +2,16 @@ package mysql
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/antlinker/go-dal"
 )
 
-func (mp *MysqlProvider) getInsertSQL(entity dal.TranEntity) (sqlText string, values []interface{}, err error) {
+func (mp *mysqlProvider) getInsertSQL(entity dal.TranEntity) (sqlText string, values []interface{}, err error) {
 	if len(entity.FieldsValue) == 0 {
-		err = mp.Error("`FieldsValue` can't be empty!")
+		err = errors.New("`FieldsValue` can't be empty")
 		return
 	}
 	var (
@@ -26,9 +27,9 @@ func (mp *MysqlProvider) getInsertSQL(entity dal.TranEntity) (sqlText string, va
 	return
 }
 
-func (mp *MysqlProvider) getUpdateSQL(entity dal.TranEntity) (sqlText string, values []interface{}, err error) {
+func (mp *mysqlProvider) getUpdateSQL(entity dal.TranEntity) (sqlText string, values []interface{}, err error) {
 	if len(entity.FieldsValue) == 0 {
-		err = mp.Error("`FieldsValue` can't be empty!")
+		err = errors.New("`FieldsValue` can't be empty")
 		return
 	}
 	var (
@@ -47,7 +48,7 @@ func (mp *MysqlProvider) getUpdateSQL(entity dal.TranEntity) (sqlText string, va
 	return
 }
 
-func (mp *MysqlProvider) getDeleteSQL(entity dal.TranEntity) (sqlText string, values []interface{}, err error) {
+func (mp *mysqlProvider) getDeleteSQL(entity dal.TranEntity) (sqlText string, values []interface{}, err error) {
 	sqlText, values, err = mp.parseCondition(entity.Condition)
 	if err != nil {
 		return
@@ -56,11 +57,11 @@ func (mp *MysqlProvider) getDeleteSQL(entity dal.TranEntity) (sqlText string, va
 	return
 }
 
-func (mp *MysqlProvider) parseCondition(cond dal.QueryCondition) (sqlText string, values []interface{}, err error) {
+func (mp *mysqlProvider) parseCondition(cond dal.QueryCondition) (sqlText string, values []interface{}, err error) {
 	switch cond.CType {
 	case dal.COND_KV:
 		if len(cond.FieldsKv) == 0 {
-			err = mp.Error("`FieldsKv` can't be empty!")
+			err = errors.New("`FieldsKv` can't be empty")
 			return
 		}
 		var (
@@ -73,18 +74,18 @@ func (mp *MysqlProvider) parseCondition(cond dal.QueryCondition) (sqlText string
 		sqlText = fmt.Sprintf("WHERE %s", strings.Join(fields, " and "))
 	case dal.COND_CV:
 		if cond.Condition == "" {
-			err = mp.Error("`Condition` can't be empty!")
+			err = errors.New("`Condition` can't be empty")
 			return
 		}
 		sqlText = cond.Condition
 		values = cond.Values
 	default:
-		err = mp.Error("`QueryCondition` can't be empty!")
+		err = errors.New("`QueryCondition` can't be empty")
 	}
 	return
 }
 
-func (mp *MysqlProvider) parseQuerySQL(entity dal.QueryEntity) (sqlText []string, values []interface{}) {
+func (mp *mysqlProvider) parseQuerySQL(entity dal.QueryEntity) (sqlText []string, values []interface{}) {
 	if entity.FieldsSelect == "" {
 		entity.FieldsSelect = "*"
 	}
@@ -107,7 +108,7 @@ func (mp *MysqlProvider) parseQuerySQL(entity dal.QueryEntity) (sqlText []string
 	return
 }
 
-func (mp *MysqlProvider) parseQueryRows(rows *sql.Rows) (datas []map[string]string, err error) {
+func (mp *mysqlProvider) parseQueryRows(rows *sql.Rows) (datas []map[string]string, err error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return
@@ -140,7 +141,7 @@ func (mp *MysqlProvider) parseQueryRows(rows *sql.Rows) (datas []map[string]stri
 	return
 }
 
-func (mp *MysqlProvider) queryData(query string, values ...interface{}) ([]map[string]string, error) {
+func (mp *mysqlProvider) queryData(query string, values ...interface{}) ([]map[string]string, error) {
 	rows, err := GDB.Query(query, values...)
 	if err != nil {
 		return nil, err
